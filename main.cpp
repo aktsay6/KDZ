@@ -5,8 +5,41 @@
 #include <queue>
 #include <vector>
 #include <fstream>
+#include <windows.h>
 
 using namespace std;
+
+void output(LONGLONG time, string algo_name, int max_flow)
+{
+    ofstream out("../output.txt", std::ios::app);
+    if(out.is_open())
+    {
+        out << "Algorithm's name: " << algo_name << ". Time consumed: " << time << " ns." << " Max flow is " << max_flow << '\n';
+    }
+    out.close();
+}
+
+void output(string& filename)
+{
+    ofstream out("../output.txt", std::ios::app);
+    if(out.is_open())
+    {
+        out << "File name: " << filename << '\n';
+    }
+    out.close();
+}
+
+void output(string text, bool append)
+{
+    ofstream out;
+    if(append)
+        out.open("../output.txt", std::ios::app);
+    else
+        out.open("../output.txt");
+    if(out.is_open())
+        out << text << '\n';
+    out.close();
+}
 
 int readInput(string& input, vector<vector<int>>& graph)
 {
@@ -19,7 +52,7 @@ int readInput(string& input, vector<vector<int>>& graph)
     {
         while(getline(in, line))
         {
-            graph.push_back(vector<int>());
+            graph.emplace_back(vector<int>());
             int i = 0;
             string tmp;
             while(i < line.size())
@@ -38,6 +71,7 @@ int readInput(string& input, vector<vector<int>>& graph)
             graph[V].push_back(stoi(tmp));
             V++;
         }
+        in.close();
     }
     return V;
 }
@@ -236,29 +270,80 @@ int edmondsKarp(size_t V, vector<vector<int>>& graph, int s, int t)
 }
 
 int main() {
-    vector<vector<int>> graph;
-    string input = "../input/input_610_0.0.txt";
-    int V = readInput(input, graph);
-    // find s and t
-    vector<int> s, t;
-    for (int i = 0; i < graph.size(); ++i)
+    string ending[] = {"_0.0.txt", "_0.5.txt", "_1.0.txt", "_disco.txt"};
+    output("", false);
+    for(int amount = 10; amount <= 310; amount+=300)
     {
-        int sum_s = 0, sum_t = 0;
-        for (int j = 0; j < graph[i].size(); ++j)
+        for(int k = 0; k < 4; k++)
         {
-            sum_s += graph[j][i];
-            sum_t += graph[i][j];
+            output("\n", true);
+            vector<vector<int>> graph;
+            string input = "../input/input_";
+            input += to_string(amount) + ending[k];
+            int V = readInput(input, graph);
+            // find s and t
+            vector<int> s, t;
+            for (int i = 0; i < graph.size(); ++i)
+            {
+                int sum_s = 0, sum_t = 0;
+                for (int j = 0; j < graph[i].size(); ++j)
+                {
+                    sum_s += graph[j][i];
+                    sum_t += graph[i][j];
+                }
+                if (sum_t == 0)
+                    t.push_back(i);
+                if (sum_s == 0)
+                    s.push_back(i);
+            }
+            int max_flow = 0;
+            LARGE_INTEGER beg, end, freq, delta;
+            QueryPerformanceFrequency(&freq);
+            for (int j = 0; j < 10; j++)
+            {
+                max_flow = 0;
+                QueryPerformanceCounter(&beg);
+                for (int i = 0; i < s.size(); ++i)
+                {
+                    max_flow += fordFulkerson(V, graph, s[i], t[i]);
+                }
+                QueryPerformanceCounter(&end);
+                delta.QuadPart += ((end.QuadPart - beg.QuadPart) * 1000000000) / freq.QuadPart;
+            }
+            delta.QuadPart /= 10;
+            output(input);
+            output(delta.QuadPart, "Ford Fulkerson", max_flow);
+            delta.QuadPart = 0;
+
+            for (int j = 0; j < 10; j++)
+            {
+                max_flow = 0;
+                QueryPerformanceCounter(&beg);
+                for (int i = 0; i < s.size(); ++i)
+                {
+                    max_flow += edmondsKarp(V, graph, s[i], t[i]);
+                }
+                QueryPerformanceCounter(&end);
+                delta.QuadPart += ((end.QuadPart - beg.QuadPart) * 1000000000) / freq.QuadPart;
+            }
+            delta.QuadPart /= 10;
+            output(delta.QuadPart, "Edmons Karp", max_flow);
+            delta.QuadPart = 0;
+
+            for (int j = 0; j < 10; j++)
+            {
+                max_flow = 0;
+                QueryPerformanceCounter(&beg);
+                for (int i = 0; i < s.size(); ++i)
+                {
+                    max_flow += dinic(V, graph, s[i], t[i]);
+                }
+                QueryPerformanceCounter(&end);
+                delta.QuadPart += ((end.QuadPart - beg.QuadPart) * 1000000000) / freq.QuadPart;
+            }
+            delta.QuadPart /= 10;
+            output(delta.QuadPart, "Dinic", max_flow);
         }
-        if(sum_t == 0)
-            t.push_back(i);
-        if(sum_s == 0)
-            s.push_back(i);
     }
-    int max_flow = 0;
-    for (int i = 0; i < s.size(); ++i)
-    {
-        max_flow += dinic(V, graph, s[i],t[i]);
-    }
-    cout << max_flow << '\n';
     return 0;
 }
